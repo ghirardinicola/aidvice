@@ -8,7 +8,7 @@ class AdviceView extends ItemView {
   }
 
   getDisplayText() {
-    return "Writing Advice";
+    return "AIdvice";
   }
 
   async onOpen() {
@@ -23,7 +23,7 @@ class AdviceView extends ItemView {
   private renderContent() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.createEl("h3", { text: "Writing Advice" });
+    container.createEl("h3", { text: "AIdvice" });
     container.createEl("p", { text: this.content });
   }
 }
@@ -42,13 +42,13 @@ export default class AiPromptPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => (this.adviceView = new AdviceView(leaf))
     );
 
-    this.addRibbonIcon('bulb', 'Toggle Writing Advice', () => {
+    this.addRibbonIcon('bulb', 'Toggle AIdvice', () => {
       this.toggleAdviceView();
     });
 
     this.addCommand({
       id: 'toggle-writing-advice',
-      name: 'Toggle Writing Advice',
+      name: 'Toggle AIdvice',
       callback: () => this.toggleAdviceView()
     });
 

@@ -1,6 +1,9 @@
-npm install -g rollup  
+# Once
+npm install -g rollup   
+Create a link in the vault .obsidian/plugins
+
+# Every edit
 npm install  
 npm run build  
-cp main.js manifest.json ~/Library/Application\ Support/obsidian/YourVaultName/.obsidian/plugins/aidvice  
 
 
