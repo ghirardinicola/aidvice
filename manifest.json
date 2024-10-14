@@ -1,0 +1,10 @@
+{
+    "id": "obsidian-aidice-plugin",
+    "name": "AIdvice Plugin",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Provides AI-generated writing advice.",
+    "author": "Ghirardi Nicola",
+    "authorUrl": "https://your-website.com",
+    "isDesktopOnly": false
+  }
