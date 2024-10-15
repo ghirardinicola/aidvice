@@ -1,7 +1,12 @@
-import { Plugin, WorkspaceLeaf, ItemView, Notice, MarkdownView, EditorChange, PluginSettingTab, App } from 'obsidian';
+import { Plugin, WorkspaceLeaf, ItemView } from 'obsidian';
 
 class AdviceView extends ItemView {
   private content: string = '';
+
+  constructor(leaf: WorkspaceLeaf) {
+    super(leaf);
+    console.log('AdviceView constructed');
+  }
 
   getViewType() {
     return "advice-view";
@@ -16,6 +21,7 @@ class AdviceView extends ItemView {
   }
 
   async setAdvice(advice: string) {
+    console.log(`setAdvice called with: ${advice}`);
     this.content = advice;
     this.renderContent();
   }
@@ -29,17 +35,17 @@ class AdviceView extends ItemView {
 }
 
 export default class AiPromptPlugin extends Plugin {
-  settings: AiPromptPluginSettings;
   private adviceView: AdviceView;
-  private lastEditTime: number = 0;
-  private adviceTimeout: NodeJS.Timeout | null = null;
 
   async onload() {
-    await this.loadSettings();
+    console.log('AiPromptPlugin onload started');
 
     this.registerView(
       "advice-view",
-      (leaf: WorkspaceLeaf) => (this.adviceView = new AdviceView(leaf))
+      (leaf) => {
+        this.adviceView = new AdviceView(leaf);
+        return this.adviceView;
+      }
     );
 
     this.addRibbonIcon('bulb', 'Toggle AIdvice', () => {
@@ -52,91 +58,68 @@ export default class AiPromptPlugin extends Plugin {
       callback: () => this.toggleAdviceView()
     });
 
-    this.registerCodeMirror((cm: CodeMirror.Editor) => {
-      cm.on('change', this.handleEditorChange.bind(this));
+    this.registerDomEvent(document, 'keyup', (evt: KeyboardEvent) => {
+      this.handleEditorChange();
     });
 
-    this.addSettingTab(new AiPromptSettingTab(this.app, this));
+    this.app.workspace.onLayoutReady(() => {
+      console.log('Layout ready, activating view');
+      this.activateView();
+    });
 
-    await this.activateView();
-    console.log('AiPromptPlugin loaded and view activated');
+    console.log('AiPromptPlugin onload completed');
   }
-  
-  async toggleAdviceView() {
-    const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType("advice-view")[0];
 
-    if (leaf) {
+  async toggleAdviceView() {
+    console.log('Toggle advice view called');
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType("advice-view");
+
+    if (existing.length) {
+      console.log('Existing view found, closing');
       await workspace.detachLeavesOfType("advice-view");
     } else {
+      console.log('No existing view, creating new one');
       await this.activateView();
     }
   }
 
   async activateView() {
+    console.log('Activating view');
     const { workspace } = this.app;
     
-    let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType("advice-view");
-
-    if (leaves.length > 0) {
-      leaf = leaves[0];
-    } else {
-      // Try to create a new leaf, but handle potential errors
-      try {
-        leaf = workspace.getRightLeaf(false);
-        if (!leaf) {
-          console.error('Failed to get right leaf');
-          return;
-        }
-        await leaf.setViewState({ type: "advice-view", active: true });
-      } catch (error) {
-        console.error('Error creating advice view:', error);
-        new Notice('Failed to create advice view. Please try reloading Obsidian.');
-        return;
-      }
+    if (workspace.getLeavesOfType("advice-view").length === 0) {
+      await workspace.getRightLeaf(false).setViewState({
+        type: "advice-view",
+        active: true,
+      });
     }
 
+    const leaf = workspace.getLeavesOfType("advice-view")[0];
     if (leaf) {
-      try {
-        workspace.revealLeaf(leaf);
-        this.getWritingAdvice();
-      } catch (error) {
-        console.error('Error revealing leaf or getting writing advice:', error);
-        new Notice('Error displaying advice view. Please try again.');
-      }
+      workspace.revealLeaf(leaf);
+      this.getWritingAdvice();
     } else {
-      console.error('Failed to create or find advice view leaf');
-      new Notice('Failed to create advice view. Please try reloading Obsidian.');
+      console.log('Failed to create or find advice view leaf');
     }
   }
 
-
-  handleEditorChange(cm: CodeMirror.Editor, change: EditorChange) {
+  handleEditorChange() {
     console.log('Editor change detected');
-    const currentTime = Date.now();
-    this.lastEditTime = currentTime;
-
-    if (this.adviceTimeout) {
-      clearTimeout(this.adviceTimeout);
+    if (this.adviceView) {
+      this.getWritingAdvice();
+    } else {
+      console.log('AdviceView not initialized');
     }
-
-    this.adviceTimeout = setTimeout(() => {
-      const timeSinceLastEdit = Date.now() - this.lastEditTime;
-      console.log(`Time since last edit: ${timeSinceLastEdit}ms`);
-      if (timeSinceLastEdit >= 5000) {  // 5 seconds
-        this.getWritingAdvice();
-      }
-    }, 5000);
   }
 
   async getWritingAdvice() {
+    console.log('Getting writing advice');
     const advice = await this.generateAdvice();
-    console.log('Generated advice:', advice);
     if (this.adviceView) {
       this.adviceView.setAdvice(advice);
     } else {
-      console.error('AdviceView is not initialized');
+      console.log('AdviceView is not initialized');
     }
   }
 
@@ -149,36 +132,5 @@ export default class AiPromptPlugin extends Plugin {
       "Reflect on how the current scene connects to your overall theme.",
     ];
     return adviceOptions[Math.floor(Math.random() * adviceOptions.length)];
-  }
-
-  async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-  }
-
-  async saveSettings() {
-    await this.saveData(this.settings);
-  }
-}
-
-interface AiPromptPluginSettings {
-  // Add any settings you need
-}
-
-const DEFAULT_SETTINGS: AiPromptPluginSettings = {
-  // Define default settings
-}
-
-class AiPromptSettingTab extends PluginSettingTab {
-  plugin: AiPromptPlugin;
-
-  constructor(app: App, plugin: AiPromptPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    // Add settings UI here
   }
 }
