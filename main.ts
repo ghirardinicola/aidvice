@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, ItemView, TFile, MarkdownView, EditorChange, PluginSettingTab, App } from 'obsidian';
+import { Plugin, WorkspaceLeaf, ItemView, Notice, MarkdownView, EditorChange, PluginSettingTab, App } from 'obsidian';
 
 class AdviceView extends ItemView {
   private content: string = '';
@@ -58,7 +58,8 @@ export default class AiPromptPlugin extends Plugin {
 
     this.addSettingTab(new AiPromptSettingTab(this.app, this));
 
-    this.activateView();
+    await this.activateView();
+    console.log('AiPromptPlugin loaded and view activated');
   }
   
   async toggleAdviceView() {
@@ -81,17 +82,38 @@ export default class AiPromptPlugin extends Plugin {
     if (leaves.length > 0) {
       leaf = leaves[0];
     } else {
-      leaf = workspace.getRightLeaf(false);
-      await leaf.setViewState({ type: "advice-view", active: true });
+      // Try to create a new leaf, but handle potential errors
+      try {
+        leaf = workspace.getRightLeaf(false);
+        if (!leaf) {
+          console.error('Failed to get right leaf');
+          return;
+        }
+        await leaf.setViewState({ type: "advice-view", active: true });
+      } catch (error) {
+        console.error('Error creating advice view:', error);
+        new Notice('Failed to create advice view. Please try reloading Obsidian.');
+        return;
+      }
     }
 
     if (leaf) {
-      workspace.revealLeaf(leaf);
-      this.getWritingAdvice();
+      try {
+        workspace.revealLeaf(leaf);
+        this.getWritingAdvice();
+      } catch (error) {
+        console.error('Error revealing leaf or getting writing advice:', error);
+        new Notice('Error displaying advice view. Please try again.');
+      }
+    } else {
+      console.error('Failed to create or find advice view leaf');
+      new Notice('Failed to create advice view. Please try reloading Obsidian.');
     }
   }
 
+
   handleEditorChange(cm: CodeMirror.Editor, change: EditorChange) {
+    console.log('Editor change detected');
     const currentTime = Date.now();
     this.lastEditTime = currentTime;
 
@@ -101,6 +123,7 @@ export default class AiPromptPlugin extends Plugin {
 
     this.adviceTimeout = setTimeout(() => {
       const timeSinceLastEdit = Date.now() - this.lastEditTime;
+      console.log(`Time since last edit: ${timeSinceLastEdit}ms`);
       if (timeSinceLastEdit >= 5000) {  // 5 seconds
         this.getWritingAdvice();
       }
@@ -109,8 +132,11 @@ export default class AiPromptPlugin extends Plugin {
 
   async getWritingAdvice() {
     const advice = await this.generateAdvice();
+    console.log('Generated advice:', advice);
     if (this.adviceView) {
       this.adviceView.setAdvice(advice);
+    } else {
+      console.error('AdviceView is not initialized');
     }
   }
 
